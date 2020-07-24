@@ -1,0 +1,4 @@
+.idea/
+
+# Ignore the built binary
+transponder

@@ -1,0 +1,10 @@
+# This is an example config file for the Transponder Scanner that uses the Server's default port numbers.
+servers:
+  - host: localhost
+    ports:
+      - protocol: HTTP
+        number: 8080
+      - protocol: HTTPS
+        number: 8443
+      - protocol: GRPC
+        number: 8081
