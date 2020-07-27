@@ -8,8 +8,8 @@ import (
 var (
 	serverCmd = &cobra.Command{
 		Use:   "server",
-		Short: "Transponder server component",
-		Long:  `Transponder is a continuously running multi-protocol network connectivity testing utility for Kubernetes and Istio.`,
+		Short: "Serve endpoints for each protocol",
+		Long:  `Transponder's server creates endpoints for each supported protocol (HTTP, HTTPS, gRPC) on a specified port so that the scanner can connect to it.`,
 		Run:   server.Serve,
 	}
 )
@@ -34,5 +34,4 @@ func init() {
 		8081,
 		"The port number to serve gRPC on.",
 	)
-
 }

@@ -8,8 +8,8 @@ import (
 var (
 	scannerCmd = &cobra.Command{
 		Use:   "scanner",
-		Short: "Transponder scanner component",
-		Long:  `Transponder is a continuously running multi-protocol network connectivity testing utility for Kubernetes and Istio.`,
+		Short: "Continuously scan servers",
+		Long:  `Transponder's scanner continuously cycles through the list of servers given in the config file and attempts to make a connection on each of the specified ports`,
 		Run:   scanner.Scan,
 	}
 )

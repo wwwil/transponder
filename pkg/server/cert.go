@@ -13,7 +13,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"github.com/pkg/errors"
-	"log"
 	"math/big"
 	"net"
 	"strings"
@@ -45,7 +44,6 @@ type KeyAndCert struct {
 func GenerateKeyAndCert(opts KeyAndCertOpts) (*KeyAndCert, error) {
 	// Check required values.
 	if len(opts.Host) == 0 {
-		log.Fatalf("")
 		return nil, errors.New("Missing required host")
 	}
 

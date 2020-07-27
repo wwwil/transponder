@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: transponder-scanner
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: transponder-scanner
+  template:
+    metadata:
+      labels:
+        app: transponder-scanner
+    spec:
+      containers:
+        - name: transponder-scanner
+          command:
+            - "transponder"
+            - "scanner"
+          args:
+            - "--config-file=/etc/transponder/scanner.yaml"
+          image: eu.gcr.io/jetstack-wil/transponder:0.0.1
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: transponder-scanner
+  labels:
+    app: transponder-scanner
+spec:
+  type: ClusterIP
+  selector:
+    app: transponder-scanner
