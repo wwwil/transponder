@@ -1,0 +1,25 @@
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+metadata:
+  name: istio
+spec:
+  profile: default
+  components:
+    ingressGateways:
+      - enabled: true
+        k8s:
+          service:
+            ports:
+              - name: http
+                port: 8080
+                targetPort: 8080
+              - name: grpc
+                port: 8081
+                targetPort: 8081
+              - name: https
+                port: 8443
+                targetPort: 8443
+            type: LoadBalancer
+  addonComponents:
+    prometheus:
+      enabled: false
