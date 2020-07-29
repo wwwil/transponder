@@ -20,14 +20,28 @@ spec:
           args:
             - "--config-file=/etc/transponder/scanner.yaml"
           image: eu.gcr.io/jetstack-wil/transponder:0.0.1
+          volumeMounts:
+            - name: scanner-config
+              mountPath: /etc/transponder
+              readOnly: true
+      volumes:
+        - name: scanner-config
+          configMap:
+            name: scanner-config
 ---
 apiVersion: v1
-kind: Service
+kind: ConfigMap
 metadata:
-  name: transponder-scanner
-  labels:
-    app: transponder-scanner
-spec:
-  type: ClusterIP
-  selector:
-    app: transponder-scanner
+  name: scanner-config
+data:
+  scanner.yaml: |
+    # This is an example config file for the Transponder Scanner that uses the Server's default port numbers.
+    servers:
+      - host: transponder-server
+        ports:
+          - protocol: HTTP
+            number: 8080
+          - protocol: HTTPS
+            number: 8443
+          - protocol: GRPC
+            number: 8081
