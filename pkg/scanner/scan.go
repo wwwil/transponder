@@ -53,38 +53,45 @@ func Scan(cmd *cobra.Command, args []string) {
 	for {
 		for _, server := range config.Servers {
 			for _, port := range server.Ports {
+				msg := fmt.Sprintf("%s:%d %s", server.Host, port.Number, port.Protocol)
+				var resp string
+				var err error
 				switch strings.ToUpper(port.Protocol) {
 				case "HTTP":
-					scanHTTP(fmt.Sprintf("%s:%d", server.Host, port.Number))
+					resp, err = scanHTTP(fmt.Sprintf("%s:%d", server.Host, port.Number))
 				case "HTTPS":
-					scanHTTPS(fmt.Sprintf("%s:%d", server.Host, port.Number))
+					resp, err = scanHTTPS(fmt.Sprintf("%s:%d", server.Host, port.Number))
 				case "GRPC":
-					scanGRPC(fmt.Sprintf("%s:%d", server.Host, port.Number))
+					resp, err = scanGRPC(fmt.Sprintf("%s:%d", server.Host, port.Number))
 				}
+				if err != nil {
+					log.Printf("%s: Error making request: %q", msg, err)
+					continue
+				}
+				log.Printf("%s: Successfully made request: %s", msg, resp)
 			}
 			time.Sleep(timeout)
 		}
 	}
 }
 
-func scanHTTP(address string) {
+func scanHTTP(address string) (string, error) {
 	client := http.Client{
 		Timeout: timeout,
 	}
 	resp, err := client.Get(fmt.Sprintf("http://%s", address))
 	if err != nil {
-		log.Println(err)
-		return
+		return "", err
 	}
 	defer resp.Body.Close()
 	body, err := httpReadBody(resp)
 	if err != nil {
-		log.Printf("HTTP: Error making request: %q", err)
+		return "", err
 	}
-	log.Printf("HTTP: Successfully made request: %s", body)
+	return body, nil
 }
 
-func scanHTTPS(address string) {
+func scanHTTPS(address string) (string, error) {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
@@ -95,21 +102,19 @@ func scanHTTPS(address string) {
 
 	req, err := http.NewRequest("GET", fmt.Sprintf("https://%s", address), nil)
 	if err != nil {
-		log.Println(err)
-		return
+		return "", err
 	}
 
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Println(err)
-		return
+		return "", err
 	}
 	defer resp.Body.Close()
 	body, err := httpReadBody(resp)
 	if err != nil {
-		log.Printf("HTTPS: Error making request: %v", err)
+		return "", err
 	}
-	log.Printf("HTTPS: Successfully made request: %s", body)
+	return body, nil
 }
 
 func httpReadBody(resp *http.Response) (string, error) {
@@ -124,7 +129,7 @@ func httpReadBody(resp *http.Response) (string, error) {
 
 }
 
-func scanGRPC(address string) {
+func scanGRPC(address string) (string, error) {
 	//cert := flag.String("cert", "/data/cert.pem", "path to TLS certificate")
 	//insecure := flag.Bool("insecure", false, "connect without TLS")
 
@@ -141,8 +146,7 @@ func scanGRPC(address string) {
 	//	conn, err = grpc.Dial(address, grpc.WithTransportCredentials(tc))
 	//}
 	if err != nil {
-		log.Printf("did not connect: %v\n", err)
-		return
+		return "", err
 	}
 	defer conn.Close()
 	c := pb.NewGreeterClient(conn)
@@ -153,12 +157,11 @@ func scanGRPC(address string) {
 	var header metadata.MD
 	r, err := c.SayHello(ctx, &pb.HelloRequest{}, grpc.Header(&header))
 	if err != nil {
-		log.Printf("gRPC: Error making request: %v", err)
-		return
+		return "", err
 	}
 	//hostname := "unknown"
 	//if len(header["hostname"]) > 0 {
 	//	hostname = header["hostname"][0]
 	//}
-	log.Printf("gRPC: Successfully made request: %s", r.Message)
+	return r.Message, nil
 }
