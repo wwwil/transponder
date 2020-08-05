@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/spf13/cobra"
+	"github.com/wwwil/transponder/pkg/version"
 	"google.golang.org/grpc"
 	pb "google.golang.org/grpc/examples/helloworld/helloworld"
 	"google.golang.org/grpc/metadata"
@@ -38,6 +39,8 @@ type Port struct {
 }
 
 func Scan(cmd *cobra.Command, args []string) {
+	log.Printf(version.ToString(false))
+	log.Println("Transponder scanner is starting.")
 	configFile, err := os.Open(ConfigFilePath)
 	if err != nil {
 		log.Fatalf("Failed to load config file for scanner from: %s", ConfigFilePath)

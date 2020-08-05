@@ -3,27 +3,28 @@ package server
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
-	"log"
-	"net"
-	"net/http"
-	"os"
-
 	"github.com/spf13/cobra"
+	"github.com/wwwil/transponder/pkg/version"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	pb "google.golang.org/grpc/examples/helloworld/helloworld"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"io/ioutil"
+	"log"
+	"net"
+	"net/http"
+	"os"
 )
 
 var (
 	HTTPPort, HTTPSPort, GRPCPort uint16
-	Hostname string
+	Hostname                      string
 )
 
 func Serve(cmd *cobra.Command, args []string) {
+	log.Println(version.ToString(false))
 	log.Println("Transponder server is starting.")
 	var err error
 	Hostname, err = os.Hostname()
