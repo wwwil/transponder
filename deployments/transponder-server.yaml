@@ -21,7 +21,7 @@ spec:
             - "--http-port=8080"
             - "--grpc-port=8081"
             - "--https-port=8443"
-          image: eu.gcr.io/jetstack-wil/transponder:0.0.1
+          image: quay.io/wwwil/transponder:v0.0.1
           ports:
             - containerPort: 8080
             - containerPort: 8081

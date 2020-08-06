@@ -19,20 +19,20 @@ spec:
             - "scanner"
           args:
             - "--config-file=/etc/transponder/scanner.yaml"
-          image: eu.gcr.io/jetstack-wil/transponder:0.0.1
+          image: quay.io/wwwil/transponder:v0.0.1
           volumeMounts:
-            - name: scanner-config
+            - name: transponder-scanner-config
               mountPath: /etc/transponder
               readOnly: true
       volumes:
-        - name: scanner-config
+        - name: transponder-scanner-config
           configMap:
-            name: scanner-config
+            name: transponder-scanner
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: scanner-config
+  name: transponder-scanner
 data:
   scanner.yaml: |
     # This is an example config file for the Transponder Scanner that uses the Server's default port numbers.

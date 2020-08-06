@@ -2,6 +2,8 @@
 
 Transponder is a continuously running multi-protocol network connectivity testing utility for Kubernetes and Istio.
 
+[![Docker Repository on Quay](https://quay.io/repository/wwwil/transponder/status "Docker Repository on Quay")](https://quay.io/repository/wwwil/transponder)
+
 :construction:
 :warning:
 **This project is currently just a proof of concept.**
@@ -28,11 +30,8 @@ Possible uses for Transponder include:
 
 ## Local Usage
 
-First build a Transponder binary:
-
-```bash
-make build
-```
+Transponder binaries can be found on the [releases page](https://github.com/wwwil/transponder/releases). Download and
+`unzip` the latest correct binary for your OS and architecture.
 
 The server can be run like so:
 
@@ -55,22 +54,45 @@ It uses a configuration file to specify a list of servers and ports to connect t
 
 ## Container Usage
 
-It's possible to build a Docker image of Transponder to run in a Kubernetes cluster:
+Transponder container images can be found on the [Quay repository](https://quay.io/repository/wwwil/transponder):
 
 ```bash
-make docker-build
+docker pull quay.io/wwwil/transponder
 ```
 
-This Docker image can then be pushed to your container registry.
+The server can be deployed to a Kubernetes cluster using the
+[server example manifest](deployments/transponder-server.yaml):
 
-The server can then be deployed to a Kubernetes cluster using the
-[server example `Deployment` manifest](deployments/transponder-server.yaml).
+```bash
+kubectl apply -f ./deployments/transponder-server.yaml
+```
 
 The scanner can either be run locally against a remote server, or also be deployed into the cluster using the
-[scanner example `Deployment` manifest](deployments/transponder-scanner.yaml).
+[scanner example manifest](deployments/transponder-scanner.yaml):
 
-These `Deployment` manifests will need to be modified to point to the container registry that you pushed the built image
-to.
+```bash
+kubectl apply -f ./deployments/transponder-scanner.yaml
+```
+
+## Demo
+
+There is a [demo](demo) to shown how Transponder can help when configuring Kubernetes and Istio. 
+
+## Building
+
+All building is handled by the [`make.sh`](make.sh) bash script which runs the function named by the argument passed to it.
+
+To build a Transponder binary run:
+
+```bash
+./make.sh build
+```
+
+To build a Docker image of Transponder:
+
+```bash
+./make.sh docker-build
+```
 
 ## Roadmap
 
