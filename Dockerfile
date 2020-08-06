@@ -11,7 +11,7 @@ RUN go mod download
 ## Bring in everything else and build an image.
 COPY . .
 
-RUN make install
+RUN ./make.sh install
 
 # STAGE 2
 # Use a distroless nonroot base image.
