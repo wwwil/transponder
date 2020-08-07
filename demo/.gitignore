@@ -1,1 +1,5 @@
-scanner.yaml
+transponder
+00-kubedns-config-1.yaml
+00-kubedns-config-2.yaml
+02-scanner.yaml
+03-transponder-server-multi-cluster.yaml

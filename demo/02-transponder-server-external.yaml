@@ -9,18 +9,7 @@ spec:
     - "*"
   http:
     - match:
-        - headers:
-            content-type:
-              exact: application/grpc
-          port: 8081
-        - headers:
-            content-type:
-              exact: application/grpc-web
-          port: 8081
-        - headers:
-            sec-websocket-protocol:
-              exact: grpc-websockets
-          port: 8081
+        - port: 8081
       route:
         - destination:
             host: transponder-server

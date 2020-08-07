@@ -4,52 +4,99 @@
 
 This demo requires a Google Cloud Platform (GCP) account.
 
-The following applications are used:
-- `istioctl` version 1.6.5
-- `kubectl` version 1.15
-- `gcloud` configured with your GCP account
+The following applications are required:
+- `istioctl` version 1.6.5 or newer.
+- `kubectl` with a version matching the clusters.
+- `gcloud` configured with your GCP account.
 
-All commands assume you are working from the `demo/` directory.
+All commands assume you are working from the `demo/` directory and use the same shell throughout the demo to reuse
+environment variables.
 
-## Set Up
+## 00. Set Up Some Clusters With Istio
 
-Set up the demo environment:
+Set environment variables for the demo:
 
 ```bash
-REGION=europe-west2
-PROJECT=jetstack-wil
-gcloud container clusters create transponder-demo --cluster-version 1.15.12-gke.6 --region $REGION --project $PROJECT
-gcloud container clusters get-credentials transponder-demo --region $REGION --project $PROJECT
+# The ID of the GCP project to use.
+PROJECT=
+# The GCP zones for the two clusters.
+ZONE_1=europe-west2-a
+ZONE_2=europe-west2-b
+```
+
+Set up the first cluster:
+
+```bash
+gcloud container clusters create transponder-demo-1 --release-channel=regular --num-nodes=3 --zone $ZONE_1 --project $PROJECT
+gcloud container clusters get-credentials transponder-demo-1 --zone $ZONE_1 --project $PROJECT
 kubectl label namespace kube-node-lease istio-injection=disabled
 kubectl label namespace kube-system istio-injection=disabled
 kubectl label namespace kube-public istio-injection=disabled
 kubectl label namespace default istio-injection=enabled
-istioctl install --set profile=default --set addonComponents.prometheus.enabled=false
-kubectl apply -f peerauthentication.yaml
+kubectl create namespace istio-system
+kubectl create secret generic cacerts -n istio-system --from-file=00-certs/ca-cert.pem \
+    --from-file=00-certs/ca-key.pem --from-file=00-certs/root-cert.pem --from-file=00-certs/cert-chain.pem
+istioctl install -f 00-istiooperator.yaml
+ISTIOCOREDNS_CLUSTERIP=$(kubectl get svc -n istio-system istiocoredns -o jsonpath={.spec.clusterIP})
+cp 00-kubedns-config.template.yaml 00-kubedns-config-1.yaml
+sed -i '' 's/istiocoredns_clusterip/'"$ISTIOCOREDNS_CLUSTERIP"'/g' 00-kubedns-config-1.yaml
+kubectl apply -f 00-kubedns-config-1.yaml
+kubectl delete pods -n kube-system -l k8s-app=kube-dns
+kubectl apply -f 00-peerauthentication.yaml
 ```
 
-## Deploy Transponder
+Then set up another cluster:
 
-Set the correct image tag for example Transponder server and scanner `Deployment` manifests and apply them to the
-cluster:
+```bash
+
+gcloud container clusters create transponder-demo-2 --release-channel=regular --num-nodes=3 --zone $ZONE_2 --project $PROJECT
+gcloud container clusters get-credentials transponder-demo-2 --zone $ZONE_2 --project $PROJECT
+kubectl label namespace kube-node-lease istio-injection=disabled
+kubectl label namespace kube-system istio-injection=disabled
+kubectl label namespace kube-public istio-injection=disabled
+kubectl label namespace default istio-injection=enabled
+kubectl create namespace istio-system
+kubectl create secret generic cacerts -n istio-system --from-file=00-certs/ca-cert.pem \
+    --from-file=00-certs/ca-key.pem --from-file=00-certs/root-cert.pem --from-file=00-certs/cert-chain.pem
+istioctl install -f 00-istiooperator.yaml
+ISTIOCOREDNS_CLUSTERIP=$(kubectl get svc -n istio-system istiocoredns -o jsonpath={.spec.clusterIP})
+cp 00-kubedns-config.template.yaml 00-kubedns-config-2.yaml
+sed -i '' 's/istiocoredns_clusterip/'"$ISTIOCOREDNS_CLUSTERIP"'/g' 00-kubedns-config-2.yaml
+kubectl apply -f 00-kubedns-config-2.yaml
+kubectl delete pods -n kube-system -l k8s-app=kube-dns
+kubectl apply -f 00-peerauthentication.yaml
+```
+
+Note that these clusters are using the same example certificates. This is a quick way to ensure they share a root of
+trust without generating individual certificates. This approach is not suitable for a production environment.
+
+## 01. Deploy Transponder To The Cluster
+
+Change `kubectl` to use the first cluster:
+
+```bash
+kubectl config use-context gke_${PROJECT}_${ZONE_1}_transponder-demo-1
+```
+
+Deploy the Transponder server and scanner into the cluster: 
 
 ```bash
 kubectl apply -f ../deployments/transponder-server.yaml
 kubectl apply -f ../deployments/transponder-scanner.yaml
 ```
 
-## Check The Scanner
-
-Check the logs of the scanner to verify that it is working:
+Wait for the `Pods` to start, then check the logs of the scanner to verify that it is working:
 
 ```bash
 POD=$(kubectl get pod -l app=transponder-scanner -o jsonpath="{.items[0].metadata.name}")
-kubectl logs $POD transponder-scanner
+kubectl logs -f $POD transponder-scanner
 ```
 
 The output should look something like this:
 
 ```bash
+2020/07/29 20:09:57 Transponder version: v0.0.1 linux/amd64
+2020/07/29 20:09:57 Transponder scanner is starting.
 2020/07/29 20:09:57 Using config file from: /etc/transponder/scanner.yaml
 2020/07/29 20:09:57 Get http://transponder-server:8080: dial tcp 10.15.253.36:8080: connect: connection refused
 2020/07/29 20:09:57 Get https://transponder-server:8443: dial tcp 10.15.253.36:8443: connect: connection refused
@@ -64,36 +111,126 @@ The output should look something like this:
 
 There may be some requests that fail initially but this is normal.
 
-## Expose Transponder
+## 02. Expose Transponder Externally and Connect Locally
 
-Deploy additional resources to make the Transponder server externally accessible:
+Deploy additional resources to make the Transponder server externally accessible via the Istio ingress gateway:
 
 ```bash
-kubectl apply -f transponder-server-external.yaml
+kubectl apply -f 02-transponder-server-external.yaml
 ```
 
 This externally exposes insecure ports and should not be used in a production environment.
 
-## Run Transponder Scanner Locally
-
 Get the external IP of the Istio ingress gateway, copy the example scanner config and change it to point at this
-address, then run `transponder scanner`.
+address:
 
 ```bash
-INGRESS_IP=$(kubectl get -n istio-system service istio-ingressgateway -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-cp ../scanner.yaml .
-sed -i '' 's/localhost/'"$INGRESS_IP"'/g' scanner.yaml
-../transponder scanner --config-file=scanner.yaml
+INGRESS_GATEWAY_IP_1=$(kubectl get -n istio-system service istio-ingressgateway -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+cp ../scanner.yaml 02-scanner.yaml
+sed -i '' 's/localhost/'"$INGRESS_GATEWAY_IP_1"'/g' 02-scanner.yaml
+```
+
+Download the Transponder binary for your platform and run the scanner it with the modified config file:
+
+```bash
+OS=darwin
+ARCH=amd64
+curl -L https://github.com/wwwil/transponder/releases/download/v0.0.1/transponder-v0.0.1-$OS-$ARCH.zip -O
+unzip -o transponder-v0.0.1-$OS-$ARCH.zip
+rm transponder-v0.0.1-$OS-$ARCH.zip
+./transponder scanner --config-file=02-scanner.yaml
 ```
 
 The output should look like this:
 
 ```bash
-2020/07/29 22:03:35 Using config file from: scanner.yaml
-2020/07/29 22:03:35 HTTP: Successfully made request: Hello from transponder-server-75b9c9c87b-hf7g9
-2020/07/29 22:03:35 HTTPS: Successfully made request: Hello from transponder-server-75b9c9c87b-hf7g9
-2020/07/29 22:03:35 gRPC: Successfully made request: Hello from transponder-server-75b9c9c87b-hf7g9
-2020/07/29 22:03:40 HTTP: Successfully made request: Hello from transponder-server-75b9c9c87b-hf7g9
-2020/07/29 22:03:40 HTTPS: Successfully made request: Hello from transponder-server-75b9c9c87b-hf7g9
-2020/07/29 22:03:40 gRPC: Successfully made request: Hello from transponder-server-75b9c9c87b-hf7g9
+2020/08/07 18:05:35 Transponder version: v0.0.1 darwin/amd64
+2020/08/07 18:05:35 Transponder scanner is starting.
+2020/08/07 18:05:35 Using config file from: 02-scanner.yaml
+2020/08/07 18:05:35 34.89.60.18:8080 HTTP: Successfully made request: Hello from transponder-server-78454877fb-lw25v
+2020/08/07 18:05:35 34.89.60.18:8443 HTTPS: Successfully made request: Hello from transponder-server-78454877fb-lw25v
+2020/08/07 18:05:35 34.89.60.18:8081 GRPC: Successfully made request: Hello from transponder-server-78454877fb-lw25v
+2020/08/07 18:05:40 34.89.60.18:8080 HTTP: Successfully made request: Hello from transponder-server-78454877fb-lw25v
+2020/08/07 18:05:40 34.89.60.18:8443 HTTPS: Successfully made request: Hello from transponder-server-78454877fb-lw25v
+2020/08/07 18:05:40 34.89.60.18:8081 GRPC: Successfully made request: Hello from transponder-server-78454877fb-lw25v
+```
+
+The local Transponder scanner is connecting to the server via the Istio ingress gateway's external IP address.
+
+## 03. Multi Cluster
+
+Change `kubectl` to use the second cluster:
+
+```bash
+kubectl config use-context gke_${PROJECT}_${ZONE_2}_transponder-demo-2
+```
+
+Deploy the Transponder server to the cluster:
+
+```bash
+kubectl apply -f ../deployments/transponder-server.yaml
+```
+
+Get the ingress gateway IP of the new cluster and add it to the `ServiceEntry` manifests for the first cluster:
+
+```bash
+INGRESS_GATEWAY_IP_2=$(kubectl get -n istio-system service istio-ingressgateway -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+cp 03-transponder-server-multi-cluster.template.yaml 03-transponder-server-multi-cluster.yaml
+sed -i '' 's/ingress_gateway_ip/'"$INGRESS_GATEWAY_IP_2"'/g' 03-transponder-server-multi-cluster.yaml
+```
+
+Switch back to the first cluster to create a `ServiceEntry` for the Transponder server in the new cluster and update
+the Transponder scanner config:
+
+```bash
+kubectl config use-context gke_${PROJECT}_${ZONE_1}_transponder-demo-1
+kubectl apply -f 03-transponder-server-multi-cluster.yaml
+POD=$(kubectl get pod -l app=transponder-scanner -o jsonpath="{.items[0].metadata.name}")
+kubectl delete pod $POD
+POD=$(kubectl get pod -l app=transponder-scanner -o jsonpath="{.items[0].metadata.name}")
+kubectl logs $POD transponder-scanner
+```
+
+The output should look like this:
+
+```bash
+2020/08/07 16:47:15 Transponder version: v0.0.1 linux/amd64
+2020/08/07 16:47:15 Transponder scanner is starting.
+2020/08/07 16:47:16 Using config file from: /etc/transponder/scanner.yaml
+2020/08/07 16:47:16 transponder-server:8080 HTTP: Error making request: "Get http://transponder-server:8080: dial tcp 10.31.253.217:8080: connect: connection refused"
+2020/08/07 16:47:16 transponder-server:8443 HTTPS: Error making request: "Get https://transponder-server:8443: dial tcp 10.31.253.217:8443: connect: connection refused"
+2020/08/07 16:47:16 transponder-server:8081 GRPC: Error making request: "rpc error: code = Unavailable desc = connection error: desc = \"transport: Error while dialing dial tcp 10.31.253.217:8081: connect: connection refused\""
+2020/08/07 16:47:21 transponder-server.default.global:8080 HTTP: Successfully made request: Hello from transponder-server-78454877fb-rh59p
+2020/08/07 16:47:21 transponder-server.default.global:8443 HTTPS: Successfully made request: Hello from transponder-server-78454877fb-rh59p
+2020/08/07 16:47:21 transponder-server.default.global:8081 GRPC: Successfully made request: Hello from transponder-server-78454877fb-rh59p
+2020/08/07 16:47:26 transponder-server:8080 HTTP: Successfully made request: Hello from transponder-server-78454877fb-lw25v
+2020/08/07 16:47:26 transponder-server:8443 HTTPS: Successfully made request: Hello from transponder-server-78454877fb-lw25v
+2020/08/07 16:47:26 transponder-server:8081 GRPC: Successfully made request: Hello from transponder-server-78454877fb-lw25v
+2020/08/07 16:47:31 transponder-server.default.global:8080 HTTP: Successfully made request: Hello from transponder-server-78454877fb-rh59p
+2020/08/07 16:47:31 transponder-server.default.global:8443 HTTPS: Successfully made request: Hello from transponder-server-78454877fb-rh59p
+2020/08/07 16:47:31 transponder-server.default.global:8081 GRPC: Successfully made request: Hello from transponder-server-78454877fb-rh59p
+```
+
+The scanner is now be connecting to both `transponder-server` in the local cluster and
+`transponder-server.default.global` in the remote cluster.
+
+Again there may be some requests that fail initially but this is normal.
+
+## Clean Up
+
+Delete the clusters:
+
+```bash
+gcloud container clusters delete transponder-demo-1 --zone $ZONE_1 --project $PROJECT
+gcloud container clusters delete transponder-demo-2 --zone $ZONE_2 --project $PROJECT
+```
+
+Remove temporary files:
+
+```bash
+rm transponder
+rm 00-kubedns-config-1.yaml
+rm 00-kubedns-config-2.yaml
+rm 02-scanner.yaml
+rm 03-transponder-server-multi-cluster.yaml
 ```

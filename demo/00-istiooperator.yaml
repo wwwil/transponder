@@ -19,7 +19,19 @@ spec:
               - name: https
                 port: 8443
                 targetPort: 8443
+              - name: tls
+                port: 15443
+                targetPort: 15443
             type: LoadBalancer
   addonComponents:
     prometheus:
       enabled: false
+    istiocoredns:
+      enabled: true
+  values:
+    global:
+      # Provides dns resolution for global services
+      podDNSSearchNamespaces:
+        - global
+      multiCluster:
+        enabled: true
