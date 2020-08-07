@@ -49,9 +49,16 @@ function package-all() {
         exit
     fi
     for BUILD in "${BUILD_DIR}"/*; do
+        if [ ! -d "${BUILD}" ]; then
+            continue
+        fi
         ZIP_NAME=${BUILD_DIR}/$(basename "${BUILD}").zip
+        if [ ! -f "${ZIP_NAME}" ]; then
+            rm "${ZIP_NAME}"
+        fi
         echo "Packaging build ${ZIP_NAME}."
-        zip -q "${ZIP_NAME}" "${BUILD}"/*
+        cd "${BUILD}"
+        zip -q "${ZIP_NAME}" ./*
     done
 }
 
