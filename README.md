@@ -2,8 +2,6 @@
 
 Transponder is a continuously running multi-protocol network connectivity testing utility for Kubernetes and Istio.
 
-[![Docker Repository on Quay](https://quay.io/repository/wwwil/transponder/status "Docker Repository on Quay")](https://quay.io/repository/wwwil/transponder)
-
 :construction:
 :warning:
 **This project is currently just a proof of concept.**
