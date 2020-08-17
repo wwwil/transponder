@@ -18,7 +18,7 @@ Set environment variables for the demo:
 
 ```bash
 # The ID of the GCP project to use.
-PROJECT=
+PROJECT=jetstack-wil
 # The GCP zones for the two clusters.
 ZONE_1=europe-west2-a
 ZONE_2=europe-west2-b
@@ -48,7 +48,6 @@ kubectl apply -f 00-peerauthentication.yaml
 Then set up another cluster:
 
 ```bash
-
 gcloud container clusters create transponder-demo-2 --release-channel=regular --num-nodes=3 --zone $ZONE_2 --project $PROJECT
 gcloud container clusters get-credentials transponder-demo-2 --zone $ZONE_2 --project $PROJECT
 kubectl label namespace kube-node-lease istio-injection=disabled
@@ -216,6 +215,64 @@ The scanner is now be connecting to both `transponder-server` in the local clust
 
 Again there may be some requests that fail initially but this is normal.
 
+## 04. Per Cluster DNS
+
+Create an `EnvoyFilter` to rewrite hostnames in the second cluster:
+
+```bash
+kubectl config use-context gke_${PROJECT}_${ZONE_2}_transponder-demo-2
+kubectl apply -f 04-envoy-filter.yaml
+```
+
+Create a `ServiceEntry` in the first cluster that points at the second cluster's Transponder server using the new
+cluster specific name:
+
+```bash
+cp 04-transponder-server-multi-cluster-dns.template.yaml 04-transponder-server-multi-cluster-dns.yaml
+sed -i '' 's/ingress_gateway_ip/'"$INGRESS_GATEWAY_IP_2"'/g' 04-transponder-server-multi-cluster-dns.yaml
+kubectl config use-context gke_${PROJECT}_${ZONE_1}_transponder-demo-1
+kubectl apply -f 04-transponder-server-multi-cluster-dns.yaml
+POD=$(kubectl get pod -l app=transponder-scanner -o jsonpath="{.items[0].metadata.name}")
+kubectl delete pod $POD
+POD=$(kubectl get pod -l app=transponder-scanner -o jsonpath="{.items[0].metadata.name}")
+kubectl logs $POD transponder-scanner
+```
+
+## 05. Service Aliases
+
+Add new stub zone to Kube DNS in the first cluster. It will update configuration without needing to restart:
+
+```bash
+kubectl config use-context gke_${PROJECT}_${ZONE_1}_transponder-demo-1
+COREDNS_SERVICE_IP_1=$()
+cp 05-kube-dns-configmap.template.yaml 05-kube-dns-configmap-transponder-demo-1.yaml
+sed -i '' 's/coredns_service_ip/'"$COREDNS_SERVICE_IP_1"'/g' 05-kube-dns-configmap-transponder-demo-1.yaml
+kubectl apply 05-kube-dns-configmap-transponder-demo-1.yaml
+```
+
+Configure CoreDNS rewriting and restart to reload the configuration:
+
+```bash
+kubectl apply 05-coredns-configmap-transponder-demo-1.yaml
+POD=$(kubectl get pod -n istio-system -l app=istiocoredns -o jsonpath="{.items[0].metadata.name}")
+kubectl delete pod $POD
+```
+
+Add `ServiceEntry`, `DestinationRule` and new Transponder scanner configuration:
+
+```bash
+kubectl apply -f 05-service-alias-transponder-demo-1.yaml
+POD=$(kubectl get pod -l app=transponder-scanner -o jsonpath="{.items[0].metadata.name}")
+kubectl delete pod $POD
+wait 5
+POD=$(kubectl get pod -l app=transponder-scanner -o jsonpath="{.items[0].metadata.name}")
+kubectl logs $POD transponder-scanner
+```
+
+## 06. Service Aliases with Multi-Cluster
+
+TODO
+
 ## Clean Up
 
 Delete the clusters:
@@ -233,4 +290,7 @@ rm 00-kubedns-config-1.yaml
 rm 00-kubedns-config-2.yaml
 rm 02-scanner.yaml
 rm 03-transponder-server-multi-cluster.yaml
+rm 04-transponder-server-multi-cluster-dns.yaml
+rm 05-kube-dns-configmap-transponder-demo-1.yaml
+rm 06-kube-dns-configmap-transponder-demo-2.yaml
 ```

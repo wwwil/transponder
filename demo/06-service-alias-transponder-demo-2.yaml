@@ -1,0 +1,30 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: ServiceEntry
+metadata:
+  name: transponder-server-zone2-k8s-example-com
+spec:
+  hosts:
+    - transponder-server.default.zone2.k8s.example.com
+  location: MESH_INTERNAL
+  ports:
+    - name: http
+      number: 8080
+      protocol: http
+    - name: grpc
+      number: 8081
+      protocol: grpc
+    - name: https
+      number: 8443
+      protocol: https
+  resolution: DNS
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: example-com
+  namespace: istio-system
+spec:
+  host: "*.k8s.example.com"
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL

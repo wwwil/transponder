@@ -3,3 +3,6 @@ transponder
 00-kubedns-config-2.yaml
 02-scanner.yaml
 03-transponder-server-multi-cluster.yaml
+04-transponder-server-multi-cluster-dns.yaml
+05-kube-dns-configmap-transponder-demo-1.yaml
+06-kube-dns-configmap-transponder-demo-2.yaml

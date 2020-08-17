@@ -1,0 +1,61 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: transponder-server
+spec:
+  gateways:
+    - "istio-system/transponder-server"
+  hosts:
+    - "*"
+  http:
+    - match:
+        - headers:
+            content-type:
+              exact: application/grpc
+          port: 443
+        - headers:
+            content-type:
+              exact: application/grpc-web
+          port: 443
+        - headers:
+            sec-websocket-protocol:
+              exact: grpc-websockets
+          port: 443
+      route:
+        - destination:
+            host: transponder-server
+            port:
+              number: 8081
+    - match:
+        - port: 443
+      route:
+        - destination:
+            host: transponder-server
+            port:
+              number: 8080
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: transponder-server
+  namespace: istio-system
+spec:
+  selector:
+    app: istio-ingressgateway
+  servers:
+    - hosts:
+        - "*"
+      port:
+        name: https-transponder-server-secure
+        number: 443
+        protocol: HTTPS
+      tls:
+        mode: PASSTHROUGH
+    - hosts:
+        - "*"
+      port:
+        name: https-transponder-server
+        number: 8443
+        protocol: HTTPS
+      tls:
+        mode: PASSTHROUGH
