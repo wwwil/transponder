@@ -1,0 +1,71 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: ServiceEntry
+metadata:
+  name: transponder-server-zone1-k8s-example-com
+spec:
+  hosts:
+    - transponder-server.default.zone1.k8s.example.com
+  location: MESH_INTERNAL
+  ports:
+    - name: http
+      number: 8080
+      protocol: http
+    - name: grpc
+      number: 8081
+      protocol: grpc
+    - name: https
+      number: 8443
+      protocol: https
+  resolution: DNS
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: example-com
+  namespace: istio-system
+spec:
+  host: "*.k8s.example.com"
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: transponder-scanner
+data:
+  scanner.yaml: |
+    # This is an example config file for the Transponder Scanner that uses the Server's default port numbers.
+    servers:
+      - host: transponder-server
+        ports:
+          - protocol: HTTP
+            number: 8080
+          - protocol: HTTPS
+            number: 8443
+          - protocol: GRPC
+            number: 8081
+      - host: transponder-server.default.global
+        ports:
+          - protocol: HTTP
+            number: 8080
+          - protocol: HTTPS
+            number: 8443
+          - protocol: GRPC
+            number: 8081
+      - host: transponder-server.default.transponder-demo-2.global
+        ports:
+          - protocol: HTTP
+            number: 8080
+          - protocol: HTTPS
+            number: 8443
+          - protocol: GRPC
+            number: 8081
+      - host: transponder-server.default.zone1.k8s.example.com
+        ports:
+          - protocol: HTTP
+            number: 8080
+          - protocol: HTTPS
+            number: 8443
+          - protocol: GRPC
+            number: 8081
